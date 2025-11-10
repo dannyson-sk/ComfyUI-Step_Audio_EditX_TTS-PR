@@ -137,7 +137,7 @@ Professional native ComfyUI nodes for **Step Audio EditX** - State-of-the-art ze
 
 ```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/dannyson-sk/ComfyUI-Step_Audio_TTS.git
+git clone https://github.com/Saganaki22/ComfyUI-Step_Audio_EditX_TTS
 cd ComfyUI-Step_Audio_TTS
 pip install -r requirements.txt
 ```
