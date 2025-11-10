@@ -411,7 +411,6 @@ Contributions welcome! Please open issues for bugs or feature requests.
 
 - ✅ Migrated to `max_new_tokens` for consistency across nodes
 - ✅ Added paralinguistic auto-fill (auto-appends effect to end when text empty)
-- ✅ Reordered edit node parameters for better UX
 - ✅ Comprehensive tooltips for all parameters
 - ✅ Fixed progress bar support (clone mode only)
 - ✅ Enhanced VRAM management and caching
