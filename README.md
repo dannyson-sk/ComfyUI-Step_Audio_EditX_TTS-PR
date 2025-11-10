@@ -78,8 +78,8 @@ Or download manually from:
 |------|-----------|--------------|------------|
 | Clone | bfloat16 | none | ~11-14GB |
 | Edit | bfloat16 | none | ~14-18GB |
-| Clone | float16 | int8 | ~6-8GB |
-| Edit | float16 | int8 | ~8-10GB |
+| Clone | float16 | int8 | ~9-11GB |
+| Edit | float16 | int8 | ~10-12GB |
 
 **Note**: Edit node uses more VRAM than clone node. We are waiting for optimized quantized models from the Step AI research team and will implement them for lower VRAM usage when available.
 
