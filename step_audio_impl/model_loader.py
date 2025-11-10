@@ -202,9 +202,9 @@ class UnifiedModelLoader:
 
         self.logger.info(f"🔧 Converted {converted_count} layers from uint8 to FP8 e4m3fn")
 
-        # Create model with config
+        # Create model with config using from_config() for AutoModelForCausalLM
         self.logger.info(f"🔧 Initializing model architecture...")
-        model = model_class(config)
+        model = model_class.from_config(config, trust_remote_code=True)
 
         # Load state dict (strict=False to handle missing/unexpected keys gracefully)
         self.logger.info(f"🔧 Loading FP8 state dict into model...")
