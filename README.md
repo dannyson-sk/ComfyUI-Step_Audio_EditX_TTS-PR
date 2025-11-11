@@ -17,15 +17,15 @@
 <br>
 
 | Clone node | Edit node |
-|------------|-----------|
-| <img width="747" height="981" alt="Screenshot 2025-11-10 210043" src="https://github.com/user-attachments/assets/c71ce957-bb69-4fef-98f0-be9afe0e9de9" /> | <img width="654" height="1081" alt="Screenshot 2025-11-10 210133" src="https://github.com/user-attachments/assets/713cb80f-6797-4ede-9444-b2b7280a4faf" /> |
-
+|-------------|------------|
+| ![Clone node](resources/2.png) | ![Edit node](resources/1.png) |
 
 <p align="center">
-  <img width="1505" height="1032" alt="image" src="https://github.com/user-attachments/assets/42c63b81-98e0-49ec-9199-3fbb04e2db9c" />
+  <img src="resources/3.png" alt="Advanced workflow using Whisper, Clone + Edit">
   <br>
   <em>Advanced workflow using Whisper, Clone + Edit</em>
 </p>
+
 
 <br>
 
