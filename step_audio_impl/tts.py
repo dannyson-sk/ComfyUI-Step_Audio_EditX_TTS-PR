@@ -103,6 +103,7 @@ class InterruptionStoppingCriteria(StoppingCriteria):
         self.input_length = 0
         self.start_time = None
         self.last_print_time = None
+        self.last_token_count = 0
         self.print_interval = 0.5  # Print progress every 0.5 seconds
 
     def _make_progress_bar(self, current, total, width=12):
@@ -132,10 +133,18 @@ class InterruptionStoppingCriteria(StoppingCriteria):
             current_time = time.time()
             if current_time - self.last_print_time >= self.print_interval:
                 elapsed = current_time - self.start_time
-                it_per_sec = new_tokens / elapsed if elapsed > 0 else 0
+                time_delta = current_time - self.last_print_time
+
+                # Calculate BOTH average and instantaneous speed
+                avg_it_per_sec = new_tokens / elapsed if elapsed > 0 else 0
+                tokens_since_last = new_tokens - self.last_token_count
+                inst_it_per_sec = tokens_since_last / time_delta if time_delta > 0 else 0
+
                 progress_bar = self._make_progress_bar(new_tokens, self.max_tokens)
-                print(f"   Progress: {progress_bar} | Speed: {it_per_sec:.2f} it/s | Elapsed: {elapsed:.1f}s", end='\r')
+                print(f"   Progress: {progress_bar} | Avg: {avg_it_per_sec:.2f} it/s | Current: {inst_it_per_sec:.2f} it/s | Elapsed: {elapsed:.1f}s", end='\r')
+
                 self.last_print_time = current_time
+                self.last_token_count = new_tokens
 
         # Check for cancellation
         try:
