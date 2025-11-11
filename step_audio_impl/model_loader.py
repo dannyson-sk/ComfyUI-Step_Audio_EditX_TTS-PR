@@ -223,10 +223,18 @@ class UnifiedModelLoader:
         init_time = time.time() - start_time
         print(f"[StepAudio] Model initialization took {init_time:.1f}s")
 
-        # Load state dict immediately (strict=False to handle missing/unexpected keys gracefully)
-        print(f"[StepAudio] 🔧 Loading FP8 state dict into model...")
+        # Load state dict with assign=True to preserve FP8 dtypes (PyTorch 2.0+)
+        print(f"[StepAudio] 🔧 Loading FP8 state dict into model (preserving FP8 dtypes)...")
         start_time = time.time()
-        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
+        try:
+            # Try with assign=True first (PyTorch 2.0+) - preserves FP8 without conversion
+            missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False, assign=True)
+            print(f"[StepAudio] ✅ Used assign=True to preserve FP8 dtypes")
+        except TypeError:
+            # Fallback for older PyTorch versions without assign parameter
+            print(f"[StepAudio] ⚠️  PyTorch version too old, assign=True not available")
+            print(f"[StepAudio] ⚠️  FP8 weights will be converted to BF16 (no VRAM savings)")
+            missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
         load_time = time.time() - start_time
         print(f"[StepAudio] State dict loading took {load_time:.1f}s")
 
