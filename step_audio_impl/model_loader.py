@@ -345,6 +345,10 @@ class UnifiedModelLoader:
             else:
                 raise ValueError(f"Unsupported model source: {source}")
 
+            # Put model in evaluation mode (disables dropout, batch norm training mode)
+            # This is CRITICAL for inference performance
+            model.eval()
+
             self.logger.info(f"Successfully loaded model from {source}")
             return model, tokenizer, model_path
 

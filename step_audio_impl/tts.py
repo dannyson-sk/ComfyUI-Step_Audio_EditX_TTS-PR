@@ -347,67 +347,70 @@ class StepAudioTTS:
         Returns:
             Tuple[torch.Tensor, int]: Generated audio tensor and sample rate
         """
-        try:
-            logger.debug(f"Starting voice cloning: {prompt_wav_path}")
-            prompt_wav, _ = torchaudio.load(prompt_wav_path)
-            vq0206_codes, vq02_codes_ori, vq06_codes_ori, speech_feat, _, speech_embedding = (
-                self.preprocess_prompt_wav(prompt_wav_path)
-            )
-            prompt_speaker = self.generate_clone_voice_id(prompt_text, prompt_wav)
-            prompt_wav_tokens = self.audio_tokenizer.merge_vq0206_to_token_str(
-                vq02_codes_ori, vq06_codes_ori
-            )
+        # Disable gradient computation for inference (CRITICAL for performance)
+        # Without this, gradients accumulate and cause severe slowdown
+        with torch.no_grad():
+            try:
+                logger.debug(f"Starting voice cloning: {prompt_wav_path}")
+                prompt_wav, _ = torchaudio.load(prompt_wav_path)
+                vq0206_codes, vq02_codes_ori, vq06_codes_ori, speech_feat, _, speech_embedding = (
+                    self.preprocess_prompt_wav(prompt_wav_path)
+                )
+                prompt_speaker = self.generate_clone_voice_id(prompt_text, prompt_wav)
+                prompt_wav_tokens = self.audio_tokenizer.merge_vq0206_to_token_str(
+                    vq02_codes_ori, vq06_codes_ori
+                )
 
-            token_ids = self._encode_audio_edit_clone_prompt(
-                target_text,
-                prompt_text,
-                prompt_speaker,
-                prompt_wav_tokens,
-            )
+                token_ids = self._encode_audio_edit_clone_prompt(
+                    target_text,
+                    prompt_text,
+                    prompt_speaker,
+                    prompt_wav_tokens,
+                )
 
-            # Get device from model
-            device = next(self.llm.parameters()).device
+                # Get device from model
+                device = next(self.llm.parameters()).device
 
-            # Prepare input tensor
-            input_tensor = torch.tensor([token_ids]).to(torch.long).to(device)
+                # Prepare input tensor
+                input_tensor = torch.tensor([token_ids]).to(torch.long).to(device)
 
-            # CRITICAL: Ensure CUDA is synchronized before generation
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
+                # CRITICAL: Ensure CUDA is synchronized before generation
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
 
-            # Set up progress tracking and cancellation
-            stopping_criteria = None
-            if progress_bar is not None:
-                stopping_criteria = StoppingCriteriaList([
-                    InterruptionStoppingCriteria(progress_bar, max_new_tokens)
-                ])
+                # Set up progress tracking and cancellation
+                stopping_criteria = None
+                if progress_bar is not None:
+                    stopping_criteria = StoppingCriteriaList([
+                        InterruptionStoppingCriteria(progress_bar, max_new_tokens)
+                    ])
 
-            output_ids = self.llm.generate(
-                input_tensor,
-                max_new_tokens=max_new_tokens,
-                temperature=temperature,
-                do_sample=do_sample,
-                logits_processor=LogitsProcessorList([RepetitionAwareLogitsProcessor()]),
-                stopping_criteria=stopping_criteria,
-            )
+                output_ids = self.llm.generate(
+                    input_tensor,
+                    max_new_tokens=max_new_tokens,
+                    temperature=temperature,
+                    do_sample=do_sample,
+                    logits_processor=LogitsProcessorList([RepetitionAwareLogitsProcessor()]),
+                    stopping_criteria=stopping_criteria,
+                )
 
-            output_ids = output_ids[:, len(token_ids) : -1]  # skip eos token
+                output_ids = output_ids[:, len(token_ids) : -1]  # skip eos token
 
-            logger.debug("Voice cloning generation completed")
-            vq0206_codes_vocoder = torch.tensor([vq0206_codes], dtype=torch.long) - 65536
+                logger.debug("Voice cloning generation completed")
+                vq0206_codes_vocoder = torch.tensor([vq0206_codes], dtype=torch.long) - 65536
 
-            # Generate audio from vocoder
-            audio_tensor = self.cosy_model.token2wav_nonstream(
-                output_ids - 65536,
-                vq0206_codes_vocoder,
-                speech_feat.to(torch.bfloat16),
-                speech_embedding.to(torch.bfloat16),
-            )
+                # Generate audio from vocoder
+                audio_tensor = self.cosy_model.token2wav_nonstream(
+                    output_ids - 65536,
+                    vq0206_codes_vocoder,
+                    speech_feat.to(torch.bfloat16),
+                    speech_embedding.to(torch.bfloat16),
+                )
 
-            return (audio_tensor, 24000)
-        except Exception as e:
-            logger.error(f"Clone failed: {e}")
-            raise
+                return (audio_tensor, 24000)
+            except Exception as e:
+                logger.error(f"Clone failed: {e}")
+                raise
 
     def edit(
         self,
@@ -430,55 +433,58 @@ class StepAudioTTS:
         Returns:
             Tuple[torch.Tensor, int]: Edited audio tensor and sample rate
         """
-        try:
-            logger.debug(f"Starting audio editing: {edit_type} - {edit_info}")
-            vq0206_codes, vq02_codes_ori, vq06_codes_ori, speech_feat, _, speech_embedding = (
-                self.preprocess_prompt_wav(input_audio_path)
-            )
-            audio_tokens = self.audio_tokenizer.merge_vq0206_to_token_str(
-                vq02_codes_ori, vq06_codes_ori
-            )
-            # Build instruction prefix based on edit type
-            instruct_prefix = self._build_audio_edit_instruction(audio_text, edit_type, edit_info, text)
+        # Disable gradient computation for inference (CRITICAL for performance)
+        # Without this, gradients accumulate and cause severe slowdown
+        with torch.no_grad():
+            try:
+                logger.debug(f"Starting audio editing: {edit_type} - {edit_info}")
+                vq0206_codes, vq02_codes_ori, vq06_codes_ori, speech_feat, _, speech_embedding = (
+                    self.preprocess_prompt_wav(input_audio_path)
+                )
+                audio_tokens = self.audio_tokenizer.merge_vq0206_to_token_str(
+                    vq02_codes_ori, vq06_codes_ori
+                )
+                # Build instruction prefix based on edit type
+                instruct_prefix = self._build_audio_edit_instruction(audio_text, edit_type, edit_info, text)
 
-            # Encode the complete prompt to token sequence
-            prompt_tokens = self._encode_audio_edit_prompt(
-                self.edit_sys_prompt, instruct_prefix, audio_tokens
-            )
+                # Encode the complete prompt to token sequence
+                prompt_tokens = self._encode_audio_edit_prompt(
+                    self.edit_sys_prompt, instruct_prefix, audio_tokens
+                )
 
-            logger.debug(f"Edit instruction: {instruct_prefix}")
-            logger.debug(f"Encoded prompt length: {len(prompt_tokens)}")
+                logger.debug(f"Edit instruction: {instruct_prefix}")
+                logger.debug(f"Encoded prompt length: {len(prompt_tokens)}")
 
-            # Get device from model
-            device = next(self.llm.parameters()).device
+                # Get device from model
+                device = next(self.llm.parameters()).device
 
-            # CRITICAL: Ensure CUDA is synchronized before generation
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
+                # CRITICAL: Ensure CUDA is synchronized before generation
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
 
-            output_ids = self.llm.generate(
-                torch.tensor([prompt_tokens]).to(torch.long).to(device),
-                max_length=8192,
-                temperature=0.7,
-                do_sample=True,
-                logits_processor=LogitsProcessorList([RepetitionAwareLogitsProcessor()]),
-            )
+                output_ids = self.llm.generate(
+                    torch.tensor([prompt_tokens]).to(torch.long).to(device),
+                    max_length=8192,
+                    temperature=0.7,
+                    do_sample=True,
+                    logits_processor=LogitsProcessorList([RepetitionAwareLogitsProcessor()]),
+                )
 
-            output_ids = output_ids[:, len(prompt_tokens) : -1]  # skip eos token
-            vq0206_codes_vocoder = torch.tensor([vq0206_codes], dtype=torch.long) - 65536
-            logger.debug("Audio editing generation completed")
-            return (
-                self.cosy_model.token2wav_nonstream(
-                    output_ids - 65536,
-                    vq0206_codes_vocoder,
-                    speech_feat.to(torch.bfloat16),
-                    speech_embedding.to(torch.bfloat16),
-                ),
-                24000,
-            )
-        except Exception as e:
-            logger.error(f"Edit failed: {e}")
-            raise
+                output_ids = output_ids[:, len(prompt_tokens) : -1]  # skip eos token
+                vq0206_codes_vocoder = torch.tensor([vq0206_codes], dtype=torch.long) - 65536
+                logger.debug("Audio editing generation completed")
+                return (
+                    self.cosy_model.token2wav_nonstream(
+                        output_ids - 65536,
+                        vq0206_codes_vocoder,
+                        speech_feat.to(torch.bfloat16),
+                        speech_embedding.to(torch.bfloat16),
+                    ),
+                    24000,
+                )
+            except Exception as e:
+                logger.error(f"Edit failed: {e}")
+                raise
 
     def _build_audio_edit_instruction(
         self,
