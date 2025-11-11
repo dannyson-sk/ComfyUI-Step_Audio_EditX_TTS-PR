@@ -121,6 +121,7 @@ class InterruptionStoppingCriteria(StoppingCriteria):
             self.start_time = time.time()
             self.last_print_time = self.start_time
             print(f"\n[StepAudio] 🚀 Generation started (max {self.max_tokens} tokens)...")
+            print(f"[StepAudio] Initial input_ids shape: {input_ids.shape}")
 
         # Update progress
         new_tokens = input_ids.shape[1] - self.input_length
@@ -135,13 +136,19 @@ class InterruptionStoppingCriteria(StoppingCriteria):
                 elapsed = current_time - self.start_time
                 time_delta = current_time - self.last_print_time
 
-                # Calculate BOTH average and instantaneous speed
-                avg_it_per_sec = new_tokens / elapsed if elapsed > 0 else 0
+                # Calculate instantaneous speed only
                 tokens_since_last = new_tokens - self.last_token_count
                 inst_it_per_sec = tokens_since_last / time_delta if time_delta > 0 else 0
 
+                # VRAM monitoring to debug slowdown
+                vram_str = ""
+                if torch.cuda.is_available():
+                    vram_allocated = torch.cuda.memory_allocated() / 1024**3  # GB
+                    vram_reserved = torch.cuda.memory_reserved() / 1024**3
+                    vram_str = f"| VRAM: {vram_allocated:.2f}GB/{vram_reserved:.2f}GB "
+
                 progress_bar = self._make_progress_bar(new_tokens, self.max_tokens)
-                print(f"   Progress: {progress_bar} | Avg: {avg_it_per_sec:.2f} it/s | Current: {inst_it_per_sec:.2f} it/s | Elapsed: {elapsed:.1f}s", end='\r')
+                print(f"   Progress: {progress_bar} | Speed: {inst_it_per_sec:.2f} it/s {vram_str}| Seq len: {input_ids.shape[1]} | Elapsed: {elapsed:.1f}s", end='\r')
 
                 self.last_print_time = current_time
                 self.last_token_count = new_tokens
