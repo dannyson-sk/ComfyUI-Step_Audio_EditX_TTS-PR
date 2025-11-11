@@ -140,15 +140,8 @@ class InterruptionStoppingCriteria(StoppingCriteria):
                 tokens_since_last = new_tokens - self.last_token_count
                 inst_it_per_sec = tokens_since_last / time_delta if time_delta > 0 else 0
 
-                # VRAM monitoring to debug slowdown
-                vram_str = ""
-                if torch.cuda.is_available():
-                    vram_allocated = torch.cuda.memory_allocated() / 1024**3  # GB
-                    vram_reserved = torch.cuda.memory_reserved() / 1024**3
-                    vram_str = f"| VRAM: {vram_allocated:.2f}GB/{vram_reserved:.2f}GB "
-
                 progress_bar = self._make_progress_bar(new_tokens, self.max_tokens)
-                print(f"   Progress: {progress_bar} | Speed: {inst_it_per_sec:.2f} it/s {vram_str}| Seq len: {input_ids.shape[1]} | Elapsed: {elapsed:.1f}s", end='\r')
+                print(f"   Progress: {progress_bar} | Speed: {inst_it_per_sec:.2f} it/s | Seq len: {input_ids.shape[1]} | Elapsed: {elapsed:.1f}s", end='\r')
 
                 self.last_print_time = current_time
                 self.last_token_count = new_tokens
@@ -406,6 +399,7 @@ class StepAudioTTS:
                     max_new_tokens=max_new_tokens,
                     temperature=temperature,
                     do_sample=do_sample,
+                    use_cache=True,  # CRITICAL: Enable KV cache to avoid O(n²) attention recalculation
                     logits_processor=LogitsProcessorList([RepetitionAwareLogitsProcessor()]),
                     stopping_criteria=stopping_criteria,
                 )
@@ -483,6 +477,7 @@ class StepAudioTTS:
                     max_length=8192,
                     temperature=0.7,
                     do_sample=True,
+                    use_cache=True,  # CRITICAL: Enable KV cache to avoid O(n²) attention recalculation
                     logits_processor=LogitsProcessorList([RepetitionAwareLogitsProcessor()]),
                 )
 
