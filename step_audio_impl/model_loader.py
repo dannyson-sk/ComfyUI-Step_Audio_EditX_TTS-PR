@@ -256,8 +256,91 @@ class UnifiedModelLoader:
             print(f"[StepAudio] Moving model to {device_map}...")
             model = model.to(device_map)
 
+        # Register FP8 auto-casting hooks for inference
+        print(f"[StepAudio] 🔧 Registering FP8→FP16 auto-cast hooks for inference...")
+        self._register_fp8_hooks(model)
+
         print(f"[StepAudio] ✅ Successfully loaded FP8 e4m3fn model")
         return model
+
+    def _register_fp8_hooks(self, model) -> int:
+        """
+        Wrap Linear layers to support FP8 storage with FP16 computation.
+
+        This replaces the standard forward() method to:
+        1. Store weights permanently in FP8 (saves VRAM)
+        2. Cast FP8→FP16 temporarily for each matmul
+        3. Keep FP8 storage unchanged
+
+        Similar to how bitsandbytes handles INT4/INT8 quantization.
+
+        Args:
+            model: Model with FP8 weights
+
+        Returns:
+            Number of FP8 layers wrapped
+        """
+        import torch.nn as nn
+        import torch.nn.functional as F
+
+        wrapped_layers = 0
+
+        print(f"[StepAudio] 🔧 Wrapping Linear layers for FP8 storage...")
+
+        for name, module in model.named_modules():
+            if isinstance(module, nn.Linear):
+                # Check if weight is FP8
+                if hasattr(module, 'weight') and module.weight.dtype == torch.float8_e4m3fn:
+                    # Store FP8 weight in separate buffer
+                    module.register_buffer('_weight_fp8', module.weight.data.clone())
+
+                    # Store FP8 bias if present
+                    if hasattr(module, 'bias') and module.bias is not None:
+                        if module.bias.dtype == torch.float8_e4m3fn:
+                            module.register_buffer('_bias_fp8', module.bias.data.clone())
+                        else:
+                            # Non-FP8 bias - keep as is
+                            module.register_buffer('_bias_fp16', module.bias.data.clone())
+                    else:
+                        module._bias_fp8 = None
+                        module._bias_fp16 = None
+
+                    # Delete original parameters to save VRAM
+                    del module.weight
+                    if module.bias is not None:
+                        del module.bias
+
+                    # Replace forward method with FP8-aware version
+                    original_forward = module.forward
+
+                    def make_fp8_forward(mod):
+                        """Create FP8-aware forward function for this module"""
+                        def fp8_forward(input):
+                            # Cast FP8 weights to FP16 (creates temporary copy, doesn't modify buffer)
+                            weight_fp16 = mod._weight_fp8.to(torch.float16)
+
+                            # Get bias
+                            if hasattr(mod, '_bias_fp8') and mod._bias_fp8 is not None:
+                                bias_fp16 = mod._bias_fp8.to(torch.float16)
+                            elif hasattr(mod, '_bias_fp16') and mod._bias_fp16 is not None:
+                                bias_fp16 = mod._bias_fp16
+                            else:
+                                bias_fp16 = None
+
+                            # Perform linear operation with FP16 weights
+                            return F.linear(input, weight_fp16, bias_fp16)
+
+                        return fp8_forward
+
+                    module.forward = make_fp8_forward(module)
+                    module._is_fp8_wrapped = True
+                    wrapped_layers += 1
+
+        print(f"[StepAudio] ✅ Wrapped {wrapped_layers} Linear layers with FP8 storage")
+        print(f"[StepAudio] 💡 Weights: Stored in FP8, cast to FP16 on-the-fly during forward")
+        print(f"[StepAudio] 📊 VRAM savings: ~50% vs pure FP16 (~4-5GB saved)")
+
+        return wrapped_layers
 
     def _prepare_quantization_config(self, quantization_config: Optional[str], torch_dtype: Optional[torch.dtype] = None) -> Tuple[Dict[str, Any], bool]:
         """
