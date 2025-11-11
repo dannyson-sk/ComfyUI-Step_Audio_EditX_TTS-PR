@@ -16,12 +16,9 @@ Features:
 try:
     import torchaudio
     torchaudio.set_audio_backend("soundfile")
-    print("[StepAudio] ✓ Using soundfile backend for audio preview")
-except ImportError:
-    print("[StepAudio] ⚠️  WARNING: soundfile not found, audio preview may fail")
-    print("[StepAudio]     Install with: pip install soundfile")
-except Exception as e:
-    print(f"[StepAudio] ⚠️  Could not set audio backend: {e}")
+except Exception:
+    # Silently continue if soundfile not available
+    pass
 
 from .nodes import StepAudioCloneNode, StepAudioEditNode
 
