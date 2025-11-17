@@ -144,9 +144,9 @@ def load_audio(audio_path: str):
     # This bypasses torchaudio's backend selection issues in containers
     waveform_np, sr = sf.read(audio_path)
     if waveform_np.ndim == 1:
-        audio_wav = torch.from_numpy(waveform_np).unsqueeze(0)  # [samples] -> [1, samples]
+        audio_wav = torch.from_numpy(waveform_np).unsqueeze(0).float()  # [samples] -> [1, samples]
     else:
-        audio_wav = torch.from_numpy(waveform_np.T)  # [samples, channels] -> [channels, samples]
+        audio_wav = torch.from_numpy(waveform_np.T).float()  # [samples, channels] -> [channels, samples]
         audio_wav = audio_wav.mean(dim=0, keepdim=True)
     return audio_wav, sr
 
