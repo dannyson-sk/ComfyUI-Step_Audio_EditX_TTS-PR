@@ -6,9 +6,17 @@ Handles model loading, caching, and VRAM management
 import os
 import sys
 import torch
+import torchaudio
 from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass
 from pathlib import Path
+
+# Set torchaudio backend for reliable BytesIO operations in containerized environments
+# Fixes "Couldn't allocate AVFormatContext" error
+try:
+    torchaudio.set_audio_backend("soundfile")
+except Exception:
+    pass  # Fallback to default backend if soundfile not available
 
 # Add bundled Step Audio implementation to path
 STEP_AUDIO_IMPL_DIR = Path(__file__).parent.parent / "step_audio_impl"
@@ -520,7 +528,6 @@ class StepAudioModelWrapper:
 
         # Additional iterations: refine the edit by re-editing the output
         if n_edit_iter > 1:
-            import torchaudio
             for i in range(n_edit_iter - 1):
                 print(f"[StepAudio]   Iteration {i+2}/{n_edit_iter}...")
 
