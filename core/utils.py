@@ -8,18 +8,10 @@ import sys
 import json
 import tempfile
 import torch
-import torchaudio
 import soundfile as sf
 import numpy as np
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
-
-# Set torchaudio backend for reliable BytesIO operations in containerized environments
-# Fixes "Couldn't allocate AVFormatContext" error
-try:
-    torchaudio.set_audio_backend("soundfile")
-except Exception:
-    pass  # Fallback to default backend if soundfile not available
 
 
 def get_step_audio_models_dir() -> Optional[str]:
@@ -193,7 +185,13 @@ def filepath_to_comfyui_audio(filepath: str) -> Dict[str, Any]:
         Dictionary with 'waveform' (torch.Tensor [1, channels, samples]) and 'sample_rate' (int)
     """
     try:
-        waveform, sample_rate = torchaudio.load(filepath)
+        # CRITICAL FIX: Use soundfile directly instead of torchaudio
+        # This bypasses torchaudio's backend selection issues in containers
+        waveform_np, sample_rate = sf.read(filepath)
+        if waveform_np.ndim == 1:
+            waveform = torch.from_numpy(waveform_np).unsqueeze(0)  # [samples] -> [1, samples]
+        else:
+            waveform = torch.from_numpy(waveform_np.T)  # [samples, channels] -> [channels, samples]
 
         # Ensure waveform is 3D [batch, channels, samples]
         if waveform.dim() == 2:
