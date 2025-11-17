@@ -356,9 +356,9 @@ class StepAudioTTS:
                 # This bypasses torchaudio's backend selection issues in containers
                 waveform_np, sample_rate = sf.read(prompt_wav_path)
                 if waveform_np.ndim == 1:
-                    prompt_wav = torch.from_numpy(waveform_np).unsqueeze(0)  # [samples] -> [1, samples]
+                    prompt_wav = torch.from_numpy(waveform_np).unsqueeze(0).float()  # [samples] -> [1, samples]
                 else:
-                    prompt_wav = torch.from_numpy(waveform_np.T)  # [samples, channels] -> [channels, samples]
+                    prompt_wav = torch.from_numpy(waveform_np.T).float()  # [samples, channels] -> [channels, samples]
                 
                 vq0206_codes, vq02_codes_ori, vq06_codes_ori, speech_feat, _, speech_embedding = (
                     self.preprocess_prompt_wav(prompt_wav_path)
@@ -627,9 +627,9 @@ class StepAudioTTS:
         # This bypasses torchaudio's backend selection issues in containers
         waveform_np, prompt_wav_sr = sf.read(prompt_wav_path)
         if waveform_np.ndim == 1:
-            prompt_wav = torch.from_numpy(waveform_np).unsqueeze(0)  # [samples] -> [1, samples]
+            prompt_wav = torch.from_numpy(waveform_np).unsqueeze(0).float()  # [samples] -> [1, samples]
         else:
-            prompt_wav = torch.from_numpy(waveform_np.T)  # [samples, channels] -> [channels, samples]
+            prompt_wav = torch.from_numpy(waveform_np.T).float()  # [samples, channels] -> [channels, samples]
         
         if prompt_wav.shape[0] > 1:
             prompt_wav = prompt_wav.mean(dim=0, keepdim=True)  # 将多通道音频转换为单通道
