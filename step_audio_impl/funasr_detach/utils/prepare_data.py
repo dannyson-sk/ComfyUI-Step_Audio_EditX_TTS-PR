@@ -9,6 +9,13 @@ import librosa
 import torch.distributed as dist
 import torchaudio
 
+# Set torchaudio backend for reliable BytesIO operations in containerized environments
+# Fixes "Couldn't allocate AVFormatContext" error
+try:
+    torchaudio.set_audio_backend("soundfile")
+except Exception:
+    pass  # Fallback to default backend if soundfile not available
+
 
 def filter_wav_text(data_dir, dataset):
     wav_file = os.path.join(data_dir, dataset, "wav.scp")
