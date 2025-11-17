@@ -6,17 +6,9 @@ Handles model loading, caching, and VRAM management
 import os
 import sys
 import torch
-import torchaudio
 from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass
 from pathlib import Path
-
-# Set torchaudio backend for reliable BytesIO operations in containerized environments
-# Fixes "Couldn't allocate AVFormatContext" error
-try:
-    torchaudio.set_audio_backend("soundfile")
-except Exception:
-    pass  # Fallback to default backend if soundfile not available
 
 # Add bundled Step Audio implementation to path
 STEP_AUDIO_IMPL_DIR = Path(__file__).parent.parent / "step_audio_impl"
@@ -505,6 +497,7 @@ class StepAudioModelWrapper:
             Progress bar is not supported in edit mode.
         """
         import tempfile
+        import soundfile as sf
 
         # CRITICAL FIX: Check if model is still valid (not cleared by cache management)
         if self.model is None:
@@ -534,12 +527,14 @@ class StepAudioModelWrapper:
                 # Save current output to temp file
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
                     temp_path = tmp_file.name
-                    # Ensure audio is in correct format for torchaudio.save
+                    # CRITICAL FIX: Use soundfile directly instead of torchaudio
+                    # This bypasses torchaudio's backend selection issues in containers
+                    # soundfile expects [samples, channels] for mono or [samples, channels] for stereo
                     if audio_tensor.dim() == 1:
-                        audio_tensor_save = audio_tensor.unsqueeze(0)
+                        waveform_np = audio_tensor.cpu().numpy()  # [samples]
                     else:
-                        audio_tensor_save = audio_tensor
-                    torchaudio.save(temp_path, audio_tensor_save, sample_rate)
+                        waveform_np = audio_tensor.cpu().numpy().T  # [channels, samples] -> [samples, channels]
+                    sf.write(temp_path, waveform_np, sample_rate)
 
                 try:
                     # Re-edit using the previous output
