@@ -6,7 +6,6 @@ import logging
 
 import numpy as np
 import torch
-import torchaudio
 import soundfile as sf
 import onnxruntime
 import whisper
